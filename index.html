@@ -40,12 +40,10 @@
     position: relative;
     border-radius: 12px;
     overflow: hidden;
-    transition: opacity 0.4s ease, transform 0.4s ease;
   }
 
   .puzzle.hidden {
-    opacity: 0;
-    transform: scale(0.96);
+    display: none;
     pointer-events: none;
   }
 
@@ -56,24 +54,10 @@
     cursor: grab;
     touch-action: none;
     user-select: none;
-    transition: transform 0.15s ease;
-  }
-
-  .piece.snapping {
-    transform: scale(1.05);
   }
 
   .hidden {
     display: none;
-  }
-
-  .question, .final {
-    animation: fadeInUp 0.5s ease forwards;
-  }
-
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   .button-group {
@@ -87,11 +71,10 @@
     border: none;
     border-radius: 999px;
     cursor: pointer;
-    transition: transform 0.15s ease, background 0.2s ease;
   }
 
   button:active {
-    transform: scale(0.94);
+    transform: scale(0.95);
   }
 
   .yes {
@@ -126,7 +109,7 @@
 
   <div class="puzzle" id="puzzle"></div>
 
-  <div id="question" class="hidden question">
+  <div id="question" class="hidden">
     <h1>Will you be my Valentine? 💌</h1>
     <div class="button-group">
       <button class="yes" onclick="yesClicked()">Yes 💖</button>
@@ -134,7 +117,7 @@
     </div>
   </div>
 
-  <div id="final" class="hidden final">
+  <div id="final" class="hidden">
     <h1>It’s a date 💕</h1>
     <p>Happy Valentine’s Day.</p>
   </div>
@@ -143,7 +126,6 @@
 <script>
   const puzzle = document.getElementById('puzzle');
   const size = 4;
-  const SNAP_DISTANCE = 20;
   let pieces = [];
   let activePiece = null;
   let offsetX = 0;
@@ -156,7 +138,8 @@
     const puzzleSize = puzzle.clientWidth;
     const pieceSize = puzzleSize / size;
 
-    const order = [...Array(size * size).keys()].sort(() => Math.random() - 0.5);
+    const order = [...Array(size * size).keys()]
+      .sort(() => Math.random() - 0.5);
 
     order.forEach((correctPos, index) => {
       const piece = document.createElement('div');
@@ -190,6 +173,7 @@
 
     activePiece.addEventListener('pointermove', onPointerMove);
     activePiece.addEventListener('pointerup', onPointerUp);
+    activePiece.addEventListener('pointercancel', onPointerUp);
   }
 
   function onPointerMove(e) {
@@ -199,31 +183,23 @@
   }
 
   function onPointerUp(e) {
-    activePiece.releasePointerCapture(e.pointerId);
+    if (!activePiece) return;
 
-    const puzzleSize = puzzle.clientWidth;
-    const pieceSize = puzzleSize / size;
+    if (activePiece.hasPointerCapture(e.pointerId)) {
+      activePiece.releasePointerCapture(e.pointerId);
+    }
 
-    let closestIndex = null;
-    let closestDistance = Infinity;
+    const pieceSize = puzzle.clientWidth / size;
+    const col = Math.round(activePiece.offsetLeft / pieceSize);
+    const row = Math.round(activePiece.offsetTop / pieceSize);
+    const targetIndex = row * size + col;
 
-    pieces.forEach(piece => {
-      if (piece === activePiece) return;
+    const targetPiece = pieces.find(
+      p => parseInt(p.dataset.index) === targetIndex
+    );
 
-      const dx = piece.offsetLeft - activePiece.offsetLeft;
-      const dy = piece.offsetTop - activePiece.offsetTop;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < closestDistance) {
-        closestDistance = dist;
-        closestIndex = piece;
-      }
-    });
-
-    if (closestIndex && closestDistance < pieceSize / 2) {
-      swapPieces(activePiece, closestIndex, pieceSize);
-      activePiece.classList.add('snapping');
-      setTimeout(() => activePiece.classList.remove('snapping'), 150);
+    if (targetPiece && targetPiece !== activePiece) {
+      swapPieces(activePiece, targetPiece, pieceSize);
     } else {
       snapBack(activePiece, pieceSize);
     }
@@ -231,6 +207,7 @@
     activePiece.style.zIndex = 1;
     activePiece.removeEventListener('pointermove', onPointerMove);
     activePiece.removeEventListener('pointerup', onPointerUp);
+    activePiece.removeEventListener('pointercancel', onPointerUp);
 
     activePiece = null;
     checkWin();
@@ -266,7 +243,7 @@
         puzzle.classList.add('hidden');
         document.getElementById('subtitle').classList.add('hidden');
         document.getElementById('question').classList.remove('hidden');
-      }, 400);
+      }, 300);
     }
   }
 
