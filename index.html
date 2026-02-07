@@ -2,48 +2,54 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>For You 💖</title>
+
 <style>
   body {
-    font-family: 'Arial', sans-serif;
+    font-family: Arial, sans-serif;
     background: linear-gradient(135deg, #ffe6eb, #fff);
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh;
     margin: 0;
   }
 
   .container {
     text-align: center;
-    max-width: 500px;
+    width: 100%;
+    max-width: 420px;
+    padding: 16px;
   }
 
   h1 {
     color: #c9184a;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   p {
     color: #555;
+    margin-top: 0;
   }
 
+  /* Responsive puzzle wrapper */
   .puzzle {
+    width: min(90vw, 360px);
+    aspect-ratio: 1 / 1;
+    margin: 20px auto;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-gap: 2px;
-    margin: 20px auto;
-    width: 320px;
-    height: 320px;
-    border-radius: 8px;
+    gap: 2px;
+    border-radius: 10px;
     overflow: hidden;
   }
 
   .piece {
-    width: 80px;
-    height: 80px;
+    width: 100%;
+    height: 100%;
     background-image: url('puzzle.jpg');
-    background-size: 320px 320px;
+    background-repeat: no-repeat;
     cursor: grab;
   }
 
@@ -51,14 +57,22 @@
     display: none;
   }
 
+  .button-group {
+    margin-top: 20px;
+  }
+
   .button-group button {
-    padding: 12px 20px;
+    padding: 14px 24px;
     font-size: 16px;
-    margin: 10px;
+    margin: 8px;
     border: none;
-    border-radius: 20px;
+    border-radius: 999px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: transform 0.2s ease;
+  }
+
+  .button-group button:active {
+    transform: scale(0.96);
   }
 
   .yes {
@@ -77,13 +91,14 @@
 
   @keyframes shake {
     0% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    50% { transform: translateX(5px); }
-    75% { transform: translateX(-5px); }
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-6px); }
     100% { transform: translateX(0); }
   }
 </style>
 </head>
+
 <body>
 
 <div class="container">
@@ -101,8 +116,8 @@
   </div>
 
   <div id="final" class="hidden">
-    <h1>It's a date 💕</h1>
-    <p>Happy Valentine's Day.</p>
+    <h1>It’s a date 💕</h1>
+    <p>Happy Valentine’s Day.</p>
   </div>
 </div>
 
@@ -111,43 +126,52 @@
   const size = 4;
   let draggedPiece = null;
 
-  let pieces = [];
+  const positions = [...Array(size * size).keys()];
+  positions.sort(() => Math.random() - 0.5);
 
-  for (let i = 0; i < size * size; i++) {
-    pieces.push(i);
+  function createPuzzle() {
+    puzzle.innerHTML = '';
+
+    const puzzleSize = puzzle.clientWidth;
+    const pieceSize = puzzleSize / size;
+
+    positions.forEach(pos => {
+      const piece = document.createElement('div');
+      piece.className = 'piece';
+      piece.draggable = true;
+      piece.dataset.correct = pos;
+
+      piece.style.backgroundSize = `${puzzleSize}px ${puzzleSize}px`;
+      piece.style.backgroundPosition = 
+        `-${(pos % size) * pieceSize}px -${Math.floor(pos / size) * pieceSize}px`;
+
+      piece.addEventListener('dragstart', () => draggedPiece = piece);
+      piece.addEventListener('dragover', e => e.preventDefault());
+      piece.addEventListener('drop', () => swapPieces(piece));
+
+      puzzle.appendChild(piece);
+    });
   }
 
-  pieces.sort(() => Math.random() - 0.5);
-
-  pieces.forEach(pos => {
-    const piece = document.createElement('div');
-    piece.classList.add('piece');
-    piece.draggable = true;
-    piece.dataset.correct = pos;
-    piece.style.backgroundPosition = 
-      `-${(pos % size) * 80}px -${Math.floor(pos / size) * 80}px`;
-
-    piece.addEventListener('dragstart', () => draggedPiece = piece);
-    piece.addEventListener('dragover', e => e.preventDefault());
-    piece.addEventListener('drop', () => swapPieces(piece));
-
-    puzzle.appendChild(piece);
-  });
-
   function swapPieces(target) {
-    const draggedNext = draggedPiece.nextSibling === target ? draggedPiece : draggedPiece.nextSibling;
+    const draggedNext =
+      draggedPiece.nextSibling === target
+        ? draggedPiece
+        : draggedPiece.nextSibling;
+
     puzzle.insertBefore(draggedPiece, target);
     puzzle.insertBefore(target, draggedNext);
+
     checkWin();
   }
 
   function checkWin() {
     const current = [...puzzle.children];
-    const correct = current.every((piece, index) =>
-      parseInt(piece.dataset.correct) === index
+    const solved = current.every(
+      (piece, index) => parseInt(piece.dataset.correct) === index
     );
 
-    if (correct) {
+    if (solved) {
       setTimeout(() => {
         puzzle.classList.add('hidden');
         document.getElementById('subtitle').classList.add('hidden');
@@ -172,6 +196,10 @@
     document.getElementById('question').classList.add('hidden');
     document.getElementById('final').classList.remove('hidden');
   }
+
+  // Recalculate on load and resize
+  window.addEventListener('load', createPuzzle);
+  window.addEventListener('resize', createPuzzle);
 </script>
 
 </body>
