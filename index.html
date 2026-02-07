@@ -51,6 +51,8 @@
     background-image: url('puzzle.jpg');
     background-repeat: no-repeat;
     cursor: grab;
+    touch-action: none;
+    user-select: none;
   }
 
   .hidden {
@@ -124,51 +126,112 @@
 <script>
   const puzzle = document.getElementById('puzzle');
   const size = 4;
-  let draggedPiece = null;
-
-  const positions = [...Array(size * size).keys()];
-  positions.sort(() => Math.random() - 0.5);
+  let pieces = [];
+  let activePiece = null;
+  let startX = 0;
+  let startY = 0;
 
   function createPuzzle() {
     puzzle.innerHTML = '';
+    pieces = [];
 
     const puzzleSize = puzzle.clientWidth;
     const pieceSize = puzzleSize / size;
 
-    positions.forEach(pos => {
+    const order = [...Array(size * size).keys()].sort(() => Math.random() - 0.5);
+
+    order.forEach((pos, index) => {
       const piece = document.createElement('div');
       piece.className = 'piece';
-      piece.draggable = true;
       piece.dataset.correct = pos;
+      piece.dataset.index = index;
 
+      piece.style.width = piece.style.height = `${pieceSize}px`;
       piece.style.backgroundSize = `${puzzleSize}px ${puzzleSize}px`;
-      piece.style.backgroundPosition = 
+      piece.style.backgroundPosition =
         `-${(pos % size) * pieceSize}px -${Math.floor(pos / size) * pieceSize}px`;
 
-      piece.addEventListener('dragstart', () => draggedPiece = piece);
-      piece.addEventListener('dragover', e => e.preventDefault());
-      piece.addEventListener('drop', () => swapPieces(piece));
+      piece.style.position = 'absolute';
+      piece.style.left = `${(index % size) * pieceSize}px`;
+      piece.style.top = `${Math.floor(index / size) * pieceSize}px`;
+
+      piece.addEventListener('pointerdown', onPointerDown);
 
       puzzle.appendChild(piece);
+      pieces.push(piece);
     });
+
+    puzzle.style.position = 'relative';
+    puzzle.style.height = `${puzzleSize}px`;
   }
 
-  function swapPieces(target) {
-    const draggedNext =
-      draggedPiece.nextSibling === target
-        ? draggedPiece
-        : draggedPiece.nextSibling;
+  function onPointerDown(e) {
+    activePiece = e.target;
+    activePiece.setPointerCapture(e.pointerId);
 
-    puzzle.insertBefore(draggedPiece, target);
-    puzzle.insertBefore(target, draggedNext);
+    startX = e.clientX - activePiece.offsetLeft;
+    startY = e.clientY - activePiece.offsetTop;
 
+    activePiece.style.zIndex = 10;
+
+    activePiece.addEventListener('pointermove', onPointerMove);
+    activePiece.addEventListener('pointerup', onPointerUp);
+  }
+
+  function onPointerMove(e) {
+    if (!activePiece) return;
+
+    activePiece.style.left = `${e.clientX - startX}px`;
+    activePiece.style.top = `${e.clientY - startY}px`;
+  }
+
+  function onPointerUp(e) {
+    activePiece.releasePointerCapture(e.pointerId);
+
+    const pieceSize = puzzle.clientWidth / size;
+    const col = Math.round(activePiece.offsetLeft / pieceSize);
+    const row = Math.round(activePiece.offsetTop / pieceSize);
+    const targetIndex = row * size + col;
+
+    const targetPiece = pieces.find(p => parseInt(p.dataset.index) === targetIndex);
+
+    if (targetPiece && targetPiece !== activePiece) {
+      swapPieces(activePiece, targetPiece, pieceSize);
+    } else {
+      snapBack(activePiece, pieceSize);
+    }
+
+    activePiece.style.zIndex = 1;
+    activePiece.removeEventListener('pointermove', onPointerMove);
+    activePiece.removeEventListener('pointerup', onPointerUp);
+
+    activePiece = null;
     checkWin();
   }
 
+  function swapPieces(a, b, sizePx) {
+    const aIndex = a.dataset.index;
+    const bIndex = b.dataset.index;
+
+    a.dataset.index = bIndex;
+    b.dataset.index = aIndex;
+
+    a.style.left = `${(bIndex % size) * sizePx}px`;
+    a.style.top = `${Math.floor(bIndex / size) * sizePx}px`;
+
+    b.style.left = `${(aIndex % size) * sizePx}px`;
+    b.style.top = `${Math.floor(aIndex / size) * sizePx}px`;
+  }
+
+  function snapBack(piece, sizePx) {
+    const index = piece.dataset.index;
+    piece.style.left = `${(index % size) * sizePx}px`;
+    piece.style.top = `${Math.floor(index / size) * sizePx}px`;
+  }
+
   function checkWin() {
-    const current = [...puzzle.children];
-    const solved = current.every(
-      (piece, index) => parseInt(piece.dataset.correct) === index
+    const solved = pieces.every(
+      piece => parseInt(piece.dataset.correct) === parseInt(piece.dataset.index)
     );
 
     if (solved) {
@@ -176,31 +239,14 @@
         puzzle.classList.add('hidden');
         document.getElementById('subtitle').classList.add('hidden');
         document.getElementById('question').classList.remove('hidden');
-      }, 500);
+      }, 400);
     }
   }
 
-  function noClicked() {
-    const noBtn = document.getElementById('noBtn');
-    noBtn.classList.add('shake');
-
-    setTimeout(() => {
-      noBtn.textContent = 'Yes 💖';
-      noBtn.classList.remove('no');
-      noBtn.classList.add('yes');
-      noBtn.onclick = yesClicked;
-    }, 400);
-  }
-
-  function yesClicked() {
-    document.getElementById('question').classList.add('hidden');
-    document.getElementById('final').classList.remove('hidden');
-  }
-
-  // Recalculate on load and resize
   window.addEventListener('load', createPuzzle);
   window.addEventListener('resize', createPuzzle);
 </script>
+
 
 </body>
 </html>
