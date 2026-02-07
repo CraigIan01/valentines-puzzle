@@ -1,12 +1,178 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Valentine's Puzzle</title>
+<meta charset="UTF-8" />
+<title>For You 💖</title>
+<style>
+  body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #ffe6eb, #fff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .container {
+    text-align: center;
+    max-width: 500px;
+  }
+
+  h1 {
+    color: #c9184a;
+    margin-bottom: 10px;
+  }
+
+  p {
+    color: #555;
+  }
+
+  .puzzle {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-gap: 2px;
+    margin: 20px auto;
+    width: 320px;
+    height: 320px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .piece {
+    width: 80px;
+    height: 80px;
+    background-image: url('puzzle.jpg');
+    background-size: 320px 320px;
+    cursor: grab;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .button-group button {
+    padding: 12px 20px;
+    font-size: 16px;
+    margin: 10px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+
+  .yes {
+    background: #ff4d6d;
+    color: white;
+  }
+
+  .no {
+    background: #adb5bd;
+    color: white;
+  }
+
+  .no.shake {
+    animation: shake 0.4s;
+  }
+
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+  }
+</style>
 </head>
 <body>
-    <h1>Valentine's Puzzle</h1>
-    <div>
-        <p>Welcome to the Valentine's Puzzle! Solve it to unlock a special surprise.</p>
-        <p>Good luck!</p>
+
+<div class="container">
+  <h1>Piece by Piece 💗</h1>
+  <p id="subtitle">Put the pieces together.</p>
+
+  <div class="puzzle" id="puzzle"></div>
+
+  <div id="question" class="hidden">
+    <h1>Will you be my Valentine? 💌</h1>
+    <div class="button-group">
+      <button class="yes" onclick="yesClicked()">Yes 💖</button>
+      <button class="no" id="noBtn" onclick="noClicked()">No 🙃</button>
     </div>
+  </div>
+
+  <div id="final" class="hidden">
+    <h1>It's a date 💕</h1>
+    <p>Happy Valentine's Day.</p>
+  </div>
+</div>
+
+<script>
+  const puzzle = document.getElementById('puzzle');
+  const size = 4;
+  let draggedPiece = null;
+
+  let pieces = [];
+
+  for (let i = 0; i < size * size; i++) {
+    pieces.push(i);
+  }
+
+  pieces.sort(() => Math.random() - 0.5);
+
+  pieces.forEach(pos => {
+    const piece = document.createElement('div');
+    piece.classList.add('piece');
+    piece.draggable = true;
+    piece.dataset.correct = pos;
+    piece.style.backgroundPosition = 
+      `-${(pos % size) * 80}px -${Math.floor(pos / size) * 80}px`;
+
+    piece.addEventListener('dragstart', () => draggedPiece = piece);
+    piece.addEventListener('dragover', e => e.preventDefault());
+    piece.addEventListener('drop', () => swapPieces(piece));
+
+    puzzle.appendChild(piece);
+  });
+
+  function swapPieces(target) {
+    const draggedNext = draggedPiece.nextSibling === target ? draggedPiece : draggedPiece.nextSibling;
+    puzzle.insertBefore(draggedPiece, target);
+    puzzle.insertBefore(target, draggedNext);
+    checkWin();
+  }
+
+  function checkWin() {
+    const current = [...puzzle.children];
+    const correct = current.every((piece, index) =>
+      parseInt(piece.dataset.correct) === index
+    );
+
+    if (correct) {
+      setTimeout(() => {
+        puzzle.classList.add('hidden');
+        document.getElementById('subtitle').classList.add('hidden');
+        document.getElementById('question').classList.remove('hidden');
+      }, 500);
+    }
+  }
+
+  function noClicked() {
+    const noBtn = document.getElementById('noBtn');
+    noBtn.classList.add('shake');
+
+    setTimeout(() => {
+      noBtn.textContent = 'Yes 💖';
+      noBtn.classList.remove('no');
+      noBtn.classList.add('yes');
+      noBtn.onclick = yesClicked;
+    }, 400);
+  }
+
+  function yesClicked() {
+    document.getElementById('question').classList.add('hidden');
+    document.getElementById('final').classList.remove('hidden');
+  }
+</script>
+
 </body>
 </html>
