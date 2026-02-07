@@ -25,7 +25,7 @@
 
   h1 {
     color: #c9184a;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   p {
@@ -33,48 +33,65 @@
     margin-top: 0;
   }
 
-  /* Responsive puzzle wrapper */
   .puzzle {
     width: min(90vw, 360px);
     aspect-ratio: 1 / 1;
     margin: 20px auto;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 2px;
-    border-radius: 10px;
+    position: relative;
+    border-radius: 12px;
     overflow: hidden;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .puzzle.hidden {
+    opacity: 0;
+    transform: scale(0.96);
+    pointer-events: none;
   }
 
   .piece {
-    width: 100%;
-    height: 100%;
+    position: absolute;
     background-image: url('puzzle.jpg');
     background-repeat: no-repeat;
     cursor: grab;
     touch-action: none;
     user-select: none;
+    transition: transform 0.15s ease;
+  }
+
+  .piece.snapping {
+    transform: scale(1.05);
   }
 
   .hidden {
     display: none;
   }
 
+  .question, .final {
+    animation: fadeInUp 0.5s ease forwards;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .button-group {
     margin-top: 20px;
   }
 
-  .button-group button {
-    padding: 14px 24px;
+  button {
+    padding: 14px 26px;
     font-size: 16px;
     margin: 8px;
     border: none;
     border-radius: 999px;
     cursor: pointer;
-    transition: transform 0.2s ease;
+    transition: transform 0.15s ease, background 0.2s ease;
   }
 
-  .button-group button:active {
-    transform: scale(0.96);
+  button:active {
+    transform: scale(0.94);
   }
 
   .yes {
@@ -88,7 +105,7 @@
   }
 
   .no.shake {
-    animation: shake 0.4s;
+    animation: shake 0.35s;
   }
 
   @keyframes shake {
@@ -109,7 +126,7 @@
 
   <div class="puzzle" id="puzzle"></div>
 
-  <div id="question" class="hidden">
+  <div id="question" class="hidden question">
     <h1>Will you be my Valentine? 💌</h1>
     <div class="button-group">
       <button class="yes" onclick="yesClicked()">Yes 💖</button>
@@ -117,7 +134,7 @@
     </div>
   </div>
 
-  <div id="final" class="hidden">
+  <div id="final" class="hidden final">
     <h1>It’s a date 💕</h1>
     <p>Happy Valentine’s Day.</p>
   </div>
@@ -126,10 +143,11 @@
 <script>
   const puzzle = document.getElementById('puzzle');
   const size = 4;
+  const SNAP_DISTANCE = 20;
   let pieces = [];
   let activePiece = null;
-  let startX = 0;
-  let startY = 0;
+  let offsetX = 0;
+  let offsetY = 0;
 
   function createPuzzle() {
     puzzle.innerHTML = '';
@@ -140,37 +158,33 @@
 
     const order = [...Array(size * size).keys()].sort(() => Math.random() - 0.5);
 
-    order.forEach((pos, index) => {
+    order.forEach((correctPos, index) => {
       const piece = document.createElement('div');
       piece.className = 'piece';
-      piece.dataset.correct = pos;
+      piece.dataset.correct = correctPos;
       piece.dataset.index = index;
 
       piece.style.width = piece.style.height = `${pieceSize}px`;
-      piece.style.backgroundSize = `${puzzleSize}px ${puzzleSize}px`;
-      piece.style.backgroundPosition =
-        `-${(pos % size) * pieceSize}px -${Math.floor(pos / size) * pieceSize}px`;
-
-      piece.style.position = 'absolute';
       piece.style.left = `${(index % size) * pieceSize}px`;
       piece.style.top = `${Math.floor(index / size) * pieceSize}px`;
+
+      piece.style.backgroundSize = `${puzzleSize}px ${puzzleSize}px`;
+      piece.style.backgroundPosition =
+        `-${(correctPos % size) * pieceSize}px -${Math.floor(correctPos / size) * pieceSize}px`;
 
       piece.addEventListener('pointerdown', onPointerDown);
 
       puzzle.appendChild(piece);
       pieces.push(piece);
     });
-
-    puzzle.style.position = 'relative';
-    puzzle.style.height = `${puzzleSize}px`;
   }
 
   function onPointerDown(e) {
-    activePiece = e.target;
+    activePiece = e.currentTarget;
     activePiece.setPointerCapture(e.pointerId);
 
-    startX = e.clientX - activePiece.offsetLeft;
-    startY = e.clientY - activePiece.offsetTop;
+    offsetX = e.clientX - activePiece.offsetLeft;
+    offsetY = e.clientY - activePiece.offsetTop;
 
     activePiece.style.zIndex = 10;
 
@@ -180,23 +194,36 @@
 
   function onPointerMove(e) {
     if (!activePiece) return;
-
-    activePiece.style.left = `${e.clientX - startX}px`;
-    activePiece.style.top = `${e.clientY - startY}px`;
+    activePiece.style.left = `${e.clientX - offsetX}px`;
+    activePiece.style.top = `${e.clientY - offsetY}px`;
   }
 
   function onPointerUp(e) {
     activePiece.releasePointerCapture(e.pointerId);
 
-    const pieceSize = puzzle.clientWidth / size;
-    const col = Math.round(activePiece.offsetLeft / pieceSize);
-    const row = Math.round(activePiece.offsetTop / pieceSize);
-    const targetIndex = row * size + col;
+    const puzzleSize = puzzle.clientWidth;
+    const pieceSize = puzzleSize / size;
 
-    const targetPiece = pieces.find(p => parseInt(p.dataset.index) === targetIndex);
+    let closestIndex = null;
+    let closestDistance = Infinity;
 
-    if (targetPiece && targetPiece !== activePiece) {
-      swapPieces(activePiece, targetPiece, pieceSize);
+    pieces.forEach(piece => {
+      if (piece === activePiece) return;
+
+      const dx = piece.offsetLeft - activePiece.offsetLeft;
+      const dy = piece.offsetTop - activePiece.offsetTop;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestIndex = piece;
+      }
+    });
+
+    if (closestIndex && closestDistance < pieceSize / 2) {
+      swapPieces(activePiece, closestIndex, pieceSize);
+      activePiece.classList.add('snapping');
+      setTimeout(() => activePiece.classList.remove('snapping'), 150);
     } else {
       snapBack(activePiece, pieceSize);
     }
@@ -231,7 +258,7 @@
 
   function checkWin() {
     const solved = pieces.every(
-      piece => parseInt(piece.dataset.correct) === parseInt(piece.dataset.index)
+      p => p.dataset.correct === p.dataset.index
     );
 
     if (solved) {
@@ -243,10 +270,25 @@
     }
   }
 
+  function noClicked() {
+    const btn = document.getElementById('noBtn');
+    btn.classList.add('shake');
+
+    setTimeout(() => {
+      btn.textContent = 'Yes 💖';
+      btn.className = 'yes';
+      btn.onclick = yesClicked;
+    }, 350);
+  }
+
+  function yesClicked() {
+    document.getElementById('question').classList.add('hidden');
+    document.getElementById('final').classList.remove('hidden');
+  }
+
   window.addEventListener('load', createPuzzle);
   window.addEventListener('resize', createPuzzle);
 </script>
-
 
 </body>
 </html>
